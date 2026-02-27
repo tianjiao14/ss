@@ -6,15 +6,15 @@
     <title>专业比赛对阵生成器</title>
     <style>
         :root {
-            --primary-color: #27ae60; 
-            --placement-color: #f39c12; 
+            --primary-color: #27ae60; /* 主色：绿 */
+            --placement-color: #f39c12; /* 排位赛：橙 */
             --bg-color: #f5f7fa;
             --card-bg: #ffffff;
             --text-main: #303133;
             --border-color: #dcdfe6;
             --header-dark: #2c3e50;
-            --line-color: #27ae60; 
-            --line-thickness: 2px; 
+            --line-color: #27ae60; /* 连线颜色 */
+            --line-thickness: 2px; /* 连线粗细 */
         }
 
         body { font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 0; }
@@ -51,7 +51,7 @@
         .name-input-toggle button.active { background-color: var(--primary-color); color: white; border-color: var(--primary-color); }
         .name-input-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
 
-        /* --- 循环赛表格 (保持原样) --- */
+        /* --- 循环赛表格  --- */
         .data-table { border-collapse: collapse; width: 100%; margin-top: 15px; font-size: 14px; }
         .data-table th, .data-table td { border: 1px solid #ccc; padding: 8px; text-align: center; }
         .data-table th { background-color: #f5f7fa; font-weight: bold; }
@@ -59,7 +59,7 @@
         .crosstable .diagonal { background: linear-gradient(to top right, transparent calc(50% - 1px), #ccc, transparent calc(50% + 1px)); background-color: #f2f2f2; }
         .schedule-table th { background-color: #2c3e50; color: white; }
 
-        /* --- 淘汰赛对阵图 (滚动 + 连线修复) --- */
+        /* --- 淘汰赛对阵图 --- */
         .result-title { text-align: center; color: var(--primary-color); margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
         
         .bracket-wrapper { 
@@ -108,6 +108,8 @@
         .participant.loser { color: #aaa; text-decoration: line-through; background-color: #f9f9f9; }
         .participant.unplayed { color: #888; }
 
+        /* --- 智能连线样式 --- */
+        /* 我们将使用 JS 计算高度，这里只定义基础样式 */
         .connector-line {
             position: absolute;
             z-index: 1;
@@ -128,7 +130,7 @@
             border-top-right-radius: 8px; /* 圆角 */
         }
 
-
+        /* 下位比赛连线：从右侧中间出发，向右，然后向上 (┘ 形状) */
         .connector-bottom {
             right: -70px;
             width: 70px;
@@ -139,6 +141,8 @@
             border-bottom-right-radius: 8px; /* 圆角 */
         }
 
+        /* 指向下一轮的水平线 (- 形状) */
+        /* 加在 Top connector 上，位于其底部向右延伸 */
         .connector-top::after {
             content: '';
             position: absolute;
@@ -192,6 +196,7 @@
         }
         .standings-list strong { color: var(--primary-color); font-weight: bold; }
 
+/* --- 打印/导出PDF 专用优化样式 --- */
 @media print {
     /* 1. 基础设置 */
     @page {
@@ -229,6 +234,9 @@
         max-width: none !important; 
     }
 
+    /* --- 核心分页控制 --- */
+
+    /* A. 混合赛第二阶段：强制换页 */
     #knockout-stage-wrapper {
         page-break-before: always !important; 
         break-before: page !important;
@@ -237,6 +245,7 @@
         display: block !important;
     }
 
+    /* B. 对阵树状图：禁止内部断裂 */
    .bracket-wrapper { 
         page-break-inside: avoid !important;
         break-inside: avoid !important;
@@ -252,7 +261,7 @@
         margin: 0 auto !important;
         zoom: 0.85; /* 适当缩小以容纳更多层级 */
     }
-
+    /* C. 排位赛独立模块 (3-4名, 5-8名) */
     .placement-block {
         page-break-inside: avoid !important;
         break-inside: avoid !important;
@@ -285,10 +294,11 @@
         border-bottom: 2px solid #000 !important;
     }
 }
-
+/* --- 新增：比分相关样式 --- */
 .match { overflow: visible !important; } 
 .score-inputs {
     position: absolute;
+    /* 这里的 bottom: 50% 意味着容器的底部正好贴在比赛块的垂直中心线上 */
     top: auto;
     bottom: 50%; 
     right: -75px;   /* 根据线长微调 */
@@ -305,7 +315,10 @@
     margin-bottom: 2px;
 }
 
+/* 2. 特殊情况 (奇数场/下位)：显示在横线【下方】 */
+/* 只要有 lower-match 标记，就执行这里的样式 */
 .lower-match .score-inputs {
+    /* 这里的 top: 50% 意味着容器的顶部正好贴在比赛块的垂直中心线上 */
     top: 50%;
     bottom: auto;
     
@@ -313,6 +326,7 @@
     margin-bottom: 0;
 }
 
+/* 单个输入框样式 (不变) */
 .score-input {
     width: 24px !important;
     height: 20px;
@@ -326,12 +340,13 @@
     margin: 0 !important;
 }
 
+/* 清除干扰  */
 .s-top, .s-bottom {
     position: static !important;
 }
 .final-score { 
     position: absolute; 
-    right: -60px; 
+    right: -60px; /* 与输入框位置一致 */
     top: 50%;
     transform: translateY(-50%);
     background-color: #fff;
@@ -392,6 +407,7 @@
 
     <div class="container" id="controls-container" style="display:none;">
         <div class="button-group">
+            <button id="refresh-btn" class="secondary-button" style="background-color: #e6a23c;">🔀 随机重新生成</button>
             <button id="save-btn" class="main-button">保存当前进度</button>
             <button id="print-btn" class="secondary-button">打印 / 导出PDF</button>
             <button id="edit-btn" class="secondary-button">修改设置</button>
@@ -437,6 +453,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('back-to-setup').onclick = showSetup;
         document.getElementById('generate-btn').onclick = generateTournament;
         document.getElementById('save-btn').onclick = () => saveData(true);
+        document.getElementById('refresh-btn').onclick = refreshTournament;
         document.getElementById('print-btn').onclick = () => window.print();
         document.getElementById('edit-btn').onclick = editCurrent;
         document.getElementById('export-json-btn').onclick = exportJson;
@@ -577,7 +594,33 @@ function handleTableBlur(e) {
 
     createTournamentObj(sportName, type, players, count, activeId);
 }
+function refreshTournament() {
+    const t = allTournaments[activeId];
+    if (!t) return;
 
+    // 弹窗确认，因为刷新会清空已录入的比分
+    if (!confirm("确定要重新随机生成对阵吗？\n警告：当前已录入的所有比赛比分和晋级结果将被清空！")) {
+        return;
+    }
+
+    if (t.type === 'knockout') {
+        // 淘汰赛：重新进行种子排序和随机洗牌
+        const seeds = arrangePlayersWithSeeding(t.players);
+        const bracketHtml = getBracketHTML(seeds, t.sportName);
+        t.html = bracketHtml;
+    } else {
+        // 循环赛或混合赛：重新调用渲染函数（内部自带洗牌逻辑）
+        renderGroupStage(t.players, t.sportName, t.type === 'mixed');
+        // renderGroupStage 会自动更新 allTournaments[activeId].html
+    }
+
+    // 重新激活当前比赛以刷新 UI
+    setActive(activeId);
+    saveData(false); // 自动保存新对阵
+    
+    // 滚动到顶部方便查看
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
    function createTournamentObj(name, type, players, count, existingId = null) {
     // 如果传入了 existingId，就用旧的 ID（覆盖更新）；否则生成新 ID
     const id = existingId || ('t_' + new Date().getTime());
@@ -768,6 +811,8 @@ function handleTableBlur(e) {
         return finalBracket;
     }
 
+/* --- 替换 getBracketHTML 函数 --- */
+
 function getBracketHTML(playerList, title) {
     let html = `<div class="container bracket-container" style="border-top: 5px solid var(--header-dark); margin-top:50px;">
                 <h2 class="result-title" style="margin-top:20px;">${title}</h2>`;
@@ -813,7 +858,6 @@ function getBracketHTML(playerList, title) {
     }
     html += `</div></div>`; 
 
-    // --- 核心修改：移除大容器，改为给每个模块单独加 "placement-block" 包装 ---
 
     if (n >= 4) {
         // 3-4名 模块
@@ -921,12 +965,14 @@ function getBracketHTML(playerList, title) {
         }
     }
 
+
 function handleMatchClick(e) {
     const p = e.target.closest('.participant');
     if (!p || p.classList.contains('unplayed') || p.textContent === "轮空") return;
     
     const match = p.parentElement;
     
+    // 撤销逻辑
     if (match.classList.contains('decided')) {
         if(confirm("撤销这场比赛结果？")) resetMatch(match);
         return;
@@ -958,12 +1004,14 @@ function handleMatchClick(e) {
     winner.classList.add('winner');
     loser.classList.add('loser');
 
+    // 获取纯净的名字 
     const wName = winner.textContent.replace(/[🥇🥈🥉]/g, '').trim();
     const lName = loser.textContent.replace(/[🥇🥈🥉]/g, '').trim();
 
     const roundDiv = match.closest('.round');
     
-
+    // A. 判断是否是决赛 (最后一轮)
+   
     if (roundDiv) {
         const allRounds = match.closest('.bracket').querySelectorAll('.round');
         // 如果当前是最后一轮
@@ -973,11 +1021,13 @@ function handleMatchClick(e) {
         }
     }
 
+    // B. 判断是否是季军赛 (铜牌赛)
     if (match.dataset.type === 'bronze') {
         winner.textContent = '🥉 ' + wName; // 季军加铜牌
     }
     // ----------------------------
 
+    // 3. 推进下一轮逻辑
     if (match.dataset.type) {
         handlePlacementAdvance(match.dataset.type, wName, lName);
     } else {
@@ -997,7 +1047,7 @@ function handleMatchClick(e) {
         
         const allRounds = match.closest('.bracket').querySelectorAll('.round');
         const totalR = allRounds.length;
-    
+        // 输的人进季军赛
         if (r === totalR - 2) updateSlot('bronze', 'unplayed', lName);
         if (r === totalR - 3) updateSlot((m < 2) ? '58_semi_1' : '58_semi_2', 'unplayed', lName);
     }
@@ -1035,10 +1085,11 @@ function resetMatch(match) {
         p.textContent = p.textContent.replace(/[🥇🥈🥉]/g, '').trim();
     });
     
- 
+    // 移除比分显示
     const scoreDisplay = match.querySelector('.final-score');
     if (scoreDisplay) scoreDisplay.remove();
     
+    // 恢复输入框
     const inputs = match.querySelector('.score-inputs');
     if (inputs) inputs.style.display = 'flex';
     
@@ -1059,7 +1110,7 @@ function resetMatch(match) {
                 
                 if (top.textContent === "轮空" && bottom.textContent !== "轮空") {
                     bottom.click();
-        
+                    // 轮空自动晋级时，隐藏分数输入框，以免看着乱
                     const inputs = m.querySelector('.score-inputs');
                     if(inputs) inputs.style.visibility = 'hidden';
                 } else if (bottom.textContent === "轮空" && top.textContent !== "轮空") {
@@ -1076,13 +1127,14 @@ function resetMatch(match) {
     const cleanName = (name) => {
         if (!name) return "";
         return name
-            .replace(/[🥇🥈🥉]/g, '')       
-            .replace(/[\(（]\d+[\)）]/g, '') 
-            .trim();                        
+            .replace(/[🥇🥈🥉]/g, '')       // 删掉奖牌图标
+            .replace(/[\(（]\d+[\)）]/g, '') // 删掉种子序号，如 (1) 或 （1）
+            .trim();                        // 删掉前后多余的空格
     };
 
     const list = {};
     
+    // 2. 修改获取比赛结果的逻辑，加入清洗步骤
     const getRes = (selector) => {
         const m = ui.results.querySelector(selector);
         if(m && m.classList.contains('decided')) {
@@ -1096,15 +1148,17 @@ function resetMatch(match) {
 
     const rounds = ui.results.querySelectorAll('.bracket .round');
     
+    // 3. 处理冠亚军 (手动获取)
     if(rounds.length > 0) {
         const finalM = rounds[rounds.length-1].querySelector('.match');
         if(finalM && finalM.classList.contains('decided')) {
-
+            // 这里也要用 cleanName 包裹一下
             list['🥇 冠军'] = cleanName(finalM.querySelector('.winner').textContent);
             list['🥈 亚军'] = cleanName(finalM.querySelector('.loser').textContent);
         }
     }
     
+    // 4. 处理季军及其他名次 (使用 getRes)
     const r34 = getRes('[data-type="bronze"]');
     if(r34) { list['🥉 季军'] = r34.w; list['第四名'] = r34.l; }
     
@@ -1114,6 +1168,7 @@ function resetMatch(match) {
     const r78 = getRes('[data-type="78_final"]');
     if(r78) { list['第七名'] = r78.w; list['第八名'] = r78.l; }
 
+    // 5. 渲染列表
     const ul = ui.results.querySelector('.standings-list');
     const cont = document.getElementById('final-standings-container');
     if(ul && cont) {
@@ -1179,7 +1234,7 @@ function renderGroupStage(players, title, isMixed) {
             
             let groupHtml = `<div class="group-container container" data-group-index="${index}">`;
             let subtitle = `<h3>${groupName} - 积分表</h3>`;
-            if (isMixed && !isSingleGroup) subtitle = `<h3>${groupName} - 积分表 <span style="font-size:0.6em; color:#666; font-weight:normal;">(前 2 名晋级)</span></h3>`;
+            if (isMixed && !isSingleGroup) subtitle = `<h3>${groupName} - 积分表 <span style="font-size:0.6em; color:#666; font-weight:normal;"></span></h3>`;
             
             groupHtml += subtitle;
             
@@ -1191,17 +1246,27 @@ function renderGroupStage(players, title, isMixed) {
             
             groupHtml += `<table class="data-table crosstable"><thead><tr><th>${isSingleGroup?'':String.fromCharCode(65+index)}</th>${headerCols}<th>积分</th><th>净胜</th><th>名次</th></tr></thead><tbody>${bodyRows}</tbody></table>`;
             
-            if (isMixed) {
-                let options = `<option value="">--请选择--</option>` + group.map(p => `<option value="${p}">${p}</option>`).join('');
-                groupHtml += `
-                <div class="qualification-box" style="background:#f0f9eb; padding:15px; margin-top:15px; border-radius:4px; border:1px solid #e1f3d8;">
-                    <div style="font-weight:bold; color:#67c23a; margin-bottom:10px;">🏆 ${groupName} 出线名单确认</div>
-                    <div style="display:flex; gap:20px;">
-                        <div style="flex:1;"><label>第一名 (晋级)</label><select class="rank-select rank-1">${options}</select></div>
-                        <div style="flex:1;"><label>第二名 (晋级)</label><select class="rank-select rank-2">${options}</select></div>
-                    </div>
-                </div>`;
-            }
+           if (isMixed) {
+    const numGroups = groups.length;
+    // 判断逻辑：如果是2个小组且总人数较少（如11人），为了凑齐前6名，每组取3人
+    const needThree = (numGroups === 2 && players.length <= 12); 
+    
+    let options = `<option value="">--请选择--</option>` + group.map(p => `<option value="${p}">${p}</option>`).join('');
+    
+    let selectHtml = `
+        <div style="flex:1;"><label>第一名</label><select class="rank-select rank-1">${options}</select></div>
+        <div style="flex:1;"><label>第二名</label><select class="rank-select rank-2">${options}</select></div>`;
+    
+    if (needThree) {
+        selectHtml += `<div style="flex:1;"><label>第三名</label><select class="rank-select rank-3">${options}</select></div>`;
+    }
+
+    groupHtml += `
+    <div class="qualification-box" style="background:#f0f9eb; padding:15px; margin-top:15px; border-radius:4px; border:1px solid #e1f3d8;">
+        <div style="font-weight:bold; color:#67c23a; margin-bottom:10px;">🏆 ${groupName} 出线名单确认</div>
+        <div style="display:flex; gap:20px;">${selectHtml}</div>
+    </div>`;
+}
 
             groupHtml += `<h3 style="margin-top: 30px;">${isSingleGroup ? '对阵日程' : groupName + ' - 对阵日程'}</h3>`;
             
@@ -1244,76 +1309,58 @@ function renderGroupStage(players, title, isMixed) {
         }
     }
 
-    function advanceMixedToKnockout() {
-        if (document.getElementById('knockout-stage-wrapper')) {
-            if (!confirm("检测到淘汰赛对阵已存在，是否重新生成？\n(注意：之前的淘汰赛进度将丢失)")) return;
-            document.getElementById('knockout-stage-wrapper').remove();
-        }
-
-        const containers = document.querySelectorAll('.group-container');
-        let qualifiers = [];
-        let isValid = true;
-
-        containers.forEach((div, i) => {
-            const r1 = div.querySelector('.rank-1').value;
-            const r2 = div.querySelector('.rank-2').value;
-            
-            if (!r1 || !r2) {
-                alert(`请完整选择“第 ${String.fromCharCode(65 + i)} 组”的第一名和第二名！`);
-                isValid = false;
-                return;
-            }
-            if (r1 === r2) {
-                alert(`“第 ${String.fromCharCode(65 + i)} 组”的第一名和第二名不能是同一个人！`);
-                isValid = false;
-                return;
-            }
-            qualifiers.push({ group: i, rank: 1, name: r1 });
-            qualifiers.push({ group: i, rank: 2, name: r2 });
-        });
-
-        if (!isValid) return;
-
-        let bracketList = [];
-        const numGroups = containers.length;
-
-        for (let i = 0; i < numGroups; i += 2) {
-            const g1 = i; 
-            const g2 = i + 1; 
-
-            if (g2 < numGroups) {
-                const a1 = qualifiers.find(q => q.group === g1 && q.rank === 1).name;
-                const a2 = qualifiers.find(q => q.group === g1 && q.rank === 2).name;
-                const b1 = qualifiers.find(q => q.group === g2 && q.rank === 1).name;
-                const b2 = qualifiers.find(q => q.group === g2 && q.rank === 2).name;
-                bracketList.push(a1, b2); 
-                bracketList.push(b1, a2);
-            } else {
-                const c1 = qualifiers.find(q => q.group === g1 && q.rank === 1).name;
-                const c2 = qualifiers.find(q => q.group === g1 && q.rank === 2).name;
-                bracketList.push(c1, c2);
-            }
-        }
-
-        const bracketHTML = getBracketHTML(bracketList, "第二阶段：淘汰赛");
-        
-        const wrapper = document.createElement('div');
-        wrapper.id = "knockout-stage-wrapper";
-        wrapper.innerHTML = bracketHTML;
-
-        const btnContainer = document.getElementById('advance-controls');
-        if(btnContainer) btnContainer.style.display = 'none';
-
-        ui.results.appendChild(wrapper);
-        wrapper.scrollIntoView({ behavior: 'smooth' });
-
-        saveData(false);
-
-        setTimeout(() => {
-            drawConnectors();
-            autoAdvanceByes();
-        }, 100);
+  function advanceMixedToKnockout() {
+    if (document.getElementById('knockout-stage-wrapper')) {
+        if (!confirm("检测到淘汰赛对阵已存在，是否重新生成？")) return;
+        document.getElementById('knockout-stage-wrapper').remove();
     }
+
+    const containers = document.querySelectorAll('.group-container');
+    let q = []; 
+    let hasRank3 = !!document.querySelector('.rank-3'); // 检查是否存在第三名选项
+
+    for (let i = 0; i < containers.length; i++) {
+        const r1 = containers[i].querySelector('.rank-1').value;
+        const r2 = containers[i].querySelector('.rank-2').value;
+        const r3 = hasRank3 ? containers[i].querySelector('.rank-3').value : null;
+        
+        if (!r1 || !r2 || (hasRank3 && !r3)) {
+            alert(`请完整选择“第 ${String.fromCharCode(65 + i)} 组”的晋级名单！`);
+            return;
+        }
+        q.push({ name: r1, rank: 1, group: i }, { name: r2, rank: 2, group: i });
+        if (hasRank3) q.push({ name: r3, rank: 3, group: i });
+    }
+
+    let bracketList = [];
+    if (hasRank3 && containers.length === 2) {
+        // 【6人晋级模式】 A1,B1轮空；A2 vs B3, B2 vs A3
+        const getQ = (g, r) => q.find(x => x.group === g && x.rank === r).name;
+        bracketList = [getQ(0,1), "轮空", getQ(1,2), getQ(0,3), getQ(1,1), "轮空", getQ(0,2), getQ(1,3)];
+    } else {
+        // 【传统模式】 每组取前两名交叉对阵 (A1 vs B2, B1 vs A2)
+        for (let i = 0; i < containers.length; i += 2) {
+            const g1 = i, g2 = i + 1;
+            if (g2 < containers.length) {
+                const a1 = q.find(x => x.group === g1 && x.rank === 1).name;
+                const a2 = q.find(x => x.group === g1 && x.rank === 2).name;
+                const b1 = q.find(x => x.group === g2 && x.rank === 1).name;
+                const b2 = q.find(x => x.group === g2 && x.rank === 2).name;
+                bracketList.push(a1, b2, b1, a2);
+            }
+        }
+    }
+
+    const title = hasRank3 ? "第二阶段：6强淘汰赛 (含轮空)" : "第二阶段：淘汰赛";
+    const bracketHTML = getBracketHTML(bracketList, title);
+    const wrapper = document.createElement('div');
+    wrapper.id = "knockout-stage-wrapper";
+    wrapper.innerHTML = bracketHTML;
+    ui.results.appendChild(wrapper);
+
+    document.getElementById('advance-controls').style.display = 'none';
+    setTimeout(() => { drawConnectors(); autoAdvanceByes(); }, 100);
+}
 
     function saveData(alertUser = true) {
         if (activeId && ui.results.style.display !== 'none') {
@@ -1360,4 +1407,3 @@ function renderGroupStage(players, title, isMixed) {
 </script>
 </body>
 </html>
-
