@@ -373,7 +373,35 @@
                 <div class="form-col"><label>参赛人数</label><input type="number" id="num-participants" value="8" min="2" required></div>
                 <div class="form-col">
                     <label>赛制选择</label>
+<div id="round-robin-settings" style="display:none; margin-top: 20px; padding: 15px; background: #f9f9f9; border: 1px solid var(--border-color); border-radius: 4px;">
+    <h4 style="margin-top:0; color: var(--primary-color);">循环/混合赛规则</h4>
+    <div class="form-row">
+        <div class="form-col">
+            <label>胜利积分</label>
+            <input type="number" id="pts-win" value="3">
+        </div>
+        <div class="form-col">
+            <label>平局积分</label>
+            <input type="number" id="pts-draw" value="1">
+        </div>
+        <div class="form-col">
+            <label>失败积分</label>
+            <input type="number" id="pts-loss" value="0">
+        </div>
+    </div>
+    <div class="form-row" style="margin-top:15px;">
+        <div class="form-col">
+            <label>小组数量 (留空则自动)</label>
+            <input type="number" id="num-groups" placeholder="自动计算">
+        </div>
+        <div class="form-col">
+            <label>每组晋级人数</label>
+            <input type="number" id="num-advance-per-group" value="2">
+        </div>
+    </div>
+</div>
                     <select id="tournament-type">
+
                         <option value="knockout">单败淘汰赛</option>
                         <option value="round-robin">循环赛</option>
                         <option value="mixed">混合赛制</option>
@@ -458,7 +486,14 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('edit-btn').onclick = editCurrent;
         document.getElementById('export-json-btn').onclick = exportJson;
         document.getElementById('import-btn').onclick = () => ui.fileInput.click();
-        
+        document.getElementById('tournament-type').addEventListener('change', function(e) {
+    const settings = document.getElementById('round-robin-settings');
+    if (e.target.value === 'round-robin' || e.target.value === 'mixed') {
+        settings.style.display = 'block';
+    } else {
+        settings.style.display = 'none';
+    }
+});
         ui.fileInput.onchange = importJson;
         ui.results.addEventListener('click', handleMatchClick);
         ui.results.addEventListener('input', handleTableInput);
@@ -1185,6 +1220,32 @@ function resetMatch(match) {
 
 function renderGroupStage(players, title, isMixed) {
     const type = isMixed ? 'mixed' : 'round-robin';
+    const count = players.length;
+    
+    // 1. 获取积分规则（用于页面展示说明）
+    const winPts = document.getElementById('pts-win')?.value || 3;
+    const drawPts = document.getElementById('pts-draw')?.value || 1;
+    const lossPts = document.getElementById('pts-loss')?.value || 0;
+
+    // 2. 确定小组数量：优先用设置页面的规则，如果没有设置就按之前的默认分组
+    let numGroups = 1; 
+    if (isMixed) {
+        const manualGroups = parseInt(document.getElementById('num-groups')?.value);
+        if (!isNaN(manualGroups) && manualGroups > 0) {
+            // 优先使用手动设置的小组数
+            numGroups = manualGroups;
+        } else {
+            // 兜底逻辑：按之前的默认分组算法
+            if (count >= 4) {
+                let autoGroups = 1;
+                while ((autoGroups * 2) * 3 <= count) autoGroups *= 2;
+                if (autoGroups === 1 && count >= 4) autoGroups = 2;
+                numGroups = autoGroups;
+            }
+        }
+    }
+
+    // 3. 选手洗牌与分配
     let seeds = [];
     let others = [];
     players.forEach(p => {
@@ -1194,120 +1255,121 @@ function renderGroupStage(players, title, isMixed) {
             others.push(p);
         }
     });
+    // 随机化以确保公平
     seeds.sort(() => 0.5 - Math.random());
     others.sort(() => 0.5 - Math.random());
 
-    const groups = [];
-    const count = players.length;
+    const groups = Array.from({ length: numGroups }, () => []);
+    let currentGroupIndex = 0;
 
-    if (type === 'round-robin') {
-        let all = [...seeds, ...others];
-        all.sort(() => 0.5 - Math.random());
-        groups.push(all);
-    } else {
-        let numGroups = 1; 
-        if (count >= 4) {
-            while ((numGroups * 2) * 3 <= count) numGroups *= 2;
-            if (numGroups === 1 && count >= 4) numGroups = 2;
-        }
-        for (let i = 0; i < numGroups; i++) groups.push([]);
-        let currentGroupIndex = 0;
-        seeds.forEach(p => {
-            groups[currentGroupIndex].push(p);
-            currentGroupIndex = (currentGroupIndex + 1) % numGroups;
-        });
-        others.forEach(p => {
-            groups[currentGroupIndex].push(p);
-            currentGroupIndex = (currentGroupIndex + 1) % numGroups;
-        });
+    // 按蛇形或循环方式分配种子和普通选手
+    seeds.forEach(p => {
+        groups[currentGroupIndex].push(p);
+        currentGroupIndex = (currentGroupIndex + 1) % numGroups;
+    });
+    others.forEach(p => {
+        groups[currentGroupIndex].push(p);
+        currentGroupIndex = (currentGroupIndex + 1) % numGroups;
+    });
 
-        groups.forEach(group => {
-            group.sort(() => 0.5 - Math.random());
-        });
-    }
+    // 小组内再次随机排序决定签位
+    groups.forEach(group => group.sort(() => 0.5 - Math.random()));
 
-        let html = `<div class="container"><h2 class="result-title">${title} - ${type === 'round-robin' ? '循环赛积分表' : '小组赛阶段'}</h2></div>`;
-        
-        groups.forEach((group, index) => {
-            const isSingleGroup = groups.length === 1;
-            const groupName = isSingleGroup ? "比赛详情" : `第 ${String.fromCharCode(65 + index)} 组`;
-            
-            let groupHtml = `<div class="group-container container" data-group-index="${index}">`;
-            let subtitle = `<h3>${groupName} - 积分表</h3>`;
-            if (isMixed && !isSingleGroup) subtitle = `<h3>${groupName} - 积分表 <span style="font-size:0.6em; color:#666; font-weight:normal;"></span></h3>`;
-            
-            groupHtml += subtitle;
-            
-            const headerCols = group.map((p, i) => `<th>${i+1}. ${p}</th>`).join('');
-            const bodyRows = group.map((player, rIdx) => {
-                const cells = group.map((_, cIdx) => rIdx === cIdx ? '<td class="diagonal"></td>' : '<td contenteditable="true"></td>').join('');
-                return `<tr><th class="player-header">${rIdx+1}. ${player}</th>${cells}<td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>`;
-            }).join('');
-            
-            groupHtml += `<table class="data-table crosstable"><thead><tr><th>${isSingleGroup?'':String.fromCharCode(65+index)}</th>${headerCols}<th>积分</th><th>净胜</th><th>名次</th></tr></thead><tbody>${bodyRows}</tbody></table>`;
-            
-           if (isMixed) {
-    const numGroups = groups.length;
-    // 判断逻辑：如果是2个小组且总人数较少（如11人），为了凑齐前6名，每组取3人
-    const needThree = (numGroups === 2 && players.length <= 12); 
-    
-    let options = `<option value="">--请选择--</option>` + group.map(p => `<option value="${p}">${p}</option>`).join('');
-    
-    let selectHtml = `
-        <div style="flex:1;"><label>第一名</label><select class="rank-select rank-1">${options}</select></div>
-        <div style="flex:1;"><label>第二名</label><select class="rank-select rank-2">${options}</select></div>`;
-    
-    if (needThree) {
-        selectHtml += `<div style="flex:1;"><label>第三名</label><select class="rank-select rank-3">${options}</select></div>`;
-    }
-
-    groupHtml += `
-    <div class="qualification-box" style="background:#f0f9eb; padding:15px; margin-top:15px; border-radius:4px; border:1px solid #e1f3d8;">
-        <div style="font-weight:bold; color:#67c23a; margin-bottom:10px;">🏆 ${groupName} 出线名单确认</div>
-        <div style="display:flex; gap:20px;">${selectHtml}</div>
+    // 4. 生成 HTML 内容
+    let html = `<div class="container">
+        <h2 class="result-title">${title} - ${type === 'round-robin' ? '循环赛积分表' : '小组赛阶段'}</h2>
+        <p style="text-align:center; color:#666; font-size:13px; margin-top:-20px; margin-bottom:20px;">
+            计分规则：胜 ${winPts} / 平 ${drawPts} / 负 ${lossPts}
+        </p>
     </div>`;
-}
-
-            groupHtml += `<h3 style="margin-top: 30px;">${isSingleGroup ? '对阵日程' : groupName + ' - 对阵日程'}</h3>`;
+    
+    groups.forEach((group, index) => {
+        const isSingleGroup = groups.length === 1;
+        const groupName = isSingleGroup ? "比赛详情" : `第 ${String.fromCharCode(65 + index)} 组`;
+        
+        let groupHtml = `<div class="group-container container" data-group-index="${index}">`;
+        groupHtml += `<h3>${groupName} - 积分表</h3>`;
+        
+        // 生成交叉对阵积分表
+        const headerCols = group.map((p, i) => `<th>${i+1}. ${p}</th>`).join('');
+        const bodyRows = group.map((player, rIdx) => {
+            const cells = group.map((_, cIdx) => rIdx === cIdx ? '<td class="diagonal"></td>' : '<td contenteditable="true"></td>').join('');
+            return `<tr><th class="player-header">${rIdx+1}. ${player}</th>${cells}<td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>`;
+        }).join('');
+        
+        groupHtml += `<table class="data-table crosstable">
+            <thead>
+                <tr><th>${isSingleGroup?'':String.fromCharCode(65+index)}</th>${headerCols}<th>积分</th><th>净胜</th><th>名次</th></tr>
+            </thead>
+            <tbody>${bodyRows}</tbody>
+        </table>`;
+        
+        // 5. 混合赛模式下的出线名单确认框
+        if (isMixed) {
+            // 获取每组晋级人数，默认为 2
+            const advanceCount = parseInt(document.getElementById('num-advance-per-group')?.value) || 2;
+            let options = `<option value="">--请选择--</option>` + group.map(p => `<option value="${p}">${p}</option>`).join('');
             
-            let gp = [...group];
-            if (gp.length % 2 !== 0) gp.push('轮空');
-            const numRounds = gp.length - 1;
-            let schedule = Array.from({length: numRounds}, () => []);
-            for (let r = 0; r < numRounds; r++) {
-                for (let i=0; i<gp.length/2; i++) {
-                    const p1 = gp[i], p2 = gp[gp.length-1-i];
-                    if(p1 !== '轮空' && p2 !== '轮空') schedule[r].push(`${p1} VS ${p2}`);
-                }
-                gp.splice(1, 0, gp.pop());
+            let selectHtml = '';
+            for (let i = 1; i <= advanceCount; i++) {
+                selectHtml += `<div style="flex:1;"><label>第 ${i} 名</label><select class="rank-select rank-${i}">${options}</select></div>`;
             }
-            const maxMatches = Math.max(0, ...schedule.map(r => r.length));
-            
-            let schedHtml = `<table class="data-table schedule-table"><thead><tr><th colspan="${numRounds}">对阵日程表</th></tr><tr>${Array.from({length: numRounds}, (_, i) => `<th>第 ${i+1} 轮</th>`).join('')}</tr></thead><tbody>`;
-            for (let i=0; i<maxMatches; i++) {
-                schedHtml += `<tr>`;
-                for(let r=0; r<numRounds; r++) { schedHtml += `<td>${schedule[r][i] || ''}</td>`; }
-                schedHtml += `</tr>`;
-            }
-            schedHtml += '</tbody></table>';
-            groupHtml += schedHtml + `</div>`;
-            html += groupHtml;
-        });
 
-        if(isMixed) {
-             html += `<div id="advance-controls" class="container" style="text-align:center; padding:40px; margin-top:20px;">
-                <p style="color:#666; margin-bottom:15px;">请先在上方各个小组确认出线名单，然后点击下方按钮</p>
-                <button id="advance-btn" class="main-button" style="font-size:16px; padding:15px 40px;">✅ 生成淘汰赛对阵 (自动交叉)</button>
-             </div>`;
+            groupHtml += `
+            <div class="qualification-box" style="background:#f0f9eb; padding:15px; margin-top:15px; border-radius:4px; border:1px solid #e1f3d8;">
+                <div style="font-weight:bold; color:#67c23a; margin-bottom:10px;">🏆 ${groupName} 出线名单确认</div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">${selectHtml}</div>
+            </div>`;
         }
 
-        allTournaments[activeId].html = html;
-        ui.results.innerHTML = html;
-
-        if(isMixed) {
-            document.getElementById('advance-btn').onclick = advanceMixedToKnockout;
+        // 6. 生成对阵日程表（编排逻辑）
+        groupHtml += `<h3 style="margin-top: 30px;">${isSingleGroup ? '对阵日程' : groupName + ' - 对阵日程'}</h3>`;
+        let gp = [...group];
+        if (gp.length % 2 !== 0) gp.push('轮空');
+        const numRounds = gp.length - 1;
+        let schedule = Array.from({length: numRounds}, () => []);
+        for (let r = 0; r < numRounds; r++) {
+            for (let i=0; i<gp.length/2; i++) {
+                const p1 = gp[i], p2 = gp[gp.length-1-i];
+                if(p1 !== '轮空' && p2 !== '轮空') schedule[r].push(`${p1} VS ${p2}`);
+            }
+            gp.splice(1, 0, gp.pop()); // 圆周法编排
         }
+        
+        const maxMatches = Math.max(0, ...schedule.map(r => r.length));
+        let schedHtml = `<table class="data-table schedule-table">
+            <thead>
+                <tr><th colspan="${numRounds}">对阵日程表</th></tr>
+                <tr>${Array.from({length: numRounds}, (_, i) => `<th>第 ${i+1} 轮</th>`).join('')}</tr>
+            </thead>
+            <tbody>`;
+        for (let i=0; i<maxMatches; i++) {
+            schedHtml += `<tr>`;
+            for(let r=0; r<numRounds; r++) { schedHtml += `<td>${schedule[r][i] || ''}</td>`; }
+            schedHtml += `</tr>`;
+        }
+        schedHtml += '</tbody></table>';
+        
+        groupHtml += schedHtml + `</div>`;
+        html += groupHtml;
+    });
+
+    // 7. 混合赛阶段切换按钮
+    if(isMixed) {
+         html += `<div id="advance-controls" class="container" style="text-align:center; padding:40px; margin-top:20px;">
+            <p style="color:#666; margin-bottom:15px;">请先在上方各个小组确认出线名单，然后点击下方按钮</p>
+            <button id="advance-btn" class="main-button" style="font-size:16px; padding:15px 40px;">✅ 生成淘汰赛对阵 (自动交叉)</button>
+         </div>`;
     }
+
+    // 更新数据模型与 UI
+    allTournaments[activeId].html = html;
+    ui.results.innerHTML = html;
+
+    if(isMixed) {
+        document.getElementById('advance-btn').onclick = advanceMixedToKnockout;
+    }
+}
 
   function advanceMixedToKnockout() {
     if (document.getElementById('knockout-stage-wrapper')) {
